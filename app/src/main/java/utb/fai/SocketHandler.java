@@ -2,6 +2,9 @@ package utb.fai;
 
 import java.io.*;
 import java.net.*;
+import java.util.*;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.*;
 
 public class SocketHandler {
@@ -40,6 +43,9 @@ public class SocketHandler {
 	 * inputFinished
 	 */
 	volatile boolean inputFinished = false;
+
+	String name = null;
+	Set<String> rooms = new HashSet<>();
 
 	public SocketHandler(Socket mySocket, ActiveHandlers activeHandlers) {
 		this.mySocket = mySocket;
@@ -89,10 +95,94 @@ public class SocketHandler {
 				 * vech aktivních handlerù, aby chodily zprávy od ostatních i nám
 				 */
 				activeHandlers.add(SocketHandler.this);
+				rooms.add("public");
 				BufferedReader reader = new BufferedReader(new InputStreamReader(mySocket.getInputStream(), "UTF-8"));
-				while ((request = reader.readLine()) != null) { // pøila od mého klienta nìjaká zpráva?
-					// ano - poli ji vem ostatním klientùm
-					request = "From client " + clientID + ": " + request;
+				while ((request = reader.readLine()) != null) {
+					
+					if (name == null) {
+						request = request.trim();
+						if (request.contains(" ")) {
+							request = "Your name cant have spaces";
+						} else if (activeHandlers.isNameTaken(request)) {
+							request = "This name is taken";
+						} else {
+							name = request;
+							request = "Your name is now: " + name;
+						}
+						System.out.println(request);
+						activeHandlers.sendMessageToSelf(SocketHandler.this, request);
+						continue;
+					}
+
+					if (request.startsWith("#setMyName")) {
+						String[] args = request.trim().split(" ", 2);
+						if (args[1].contains(" ")) {
+							request = "Your name cant have spaces";
+						} else if (args[1].equals(name)) {
+							request = "You cant set your new name to be the same as your old name";
+						} else if (activeHandlers.isNameTaken(args[1])) {
+							request = "This name is taken";
+						} else {
+							name = args[1];
+							request = "Your name is now: " + name;
+						}
+						System.out.println(request);
+						activeHandlers.sendMessageToSelf(SocketHandler.this, request);
+						continue;
+					}
+
+					if (request.startsWith("#sendPrivate")) {
+						String[] args = request.trim().split(" ", 3);
+							request = "[" + name + "] >> " + args[2];
+							System.out.println(request);
+							if (!activeHandlers.sendMessageToName(request, args[1])) {
+								request = "This person: " + args[1] + " couldnt be found";
+								System.out.println(request);
+								activeHandlers.sendMessageToSelf(SocketHandler.this, request);
+							}
+						continue;
+					}
+
+					if (request.startsWith("#join")) {
+						String[] args = request.trim().split(" ", 2);
+						if (args[1].contains(" ")) {
+							request = "Room names cant have spaces";
+						} else if (rooms.contains(args[1])) {
+							request = "You are currently in this room";
+						} else {
+							rooms.add(args[1]);
+							request = "You have joined the group";
+						}
+						System.out.println(request);
+						activeHandlers.sendMessageToSelf(SocketHandler.this, request);
+						continue;
+					}
+
+					if (request.startsWith("#leave")) {
+						String[] args = request.trim().split(" ", 2);
+						if (args[1].contains(" ")) {
+							request = "Room names cant have spaces";
+						} else if (!rooms.contains(args[1])) {
+							request = "You are not in this room";
+						} else {
+							rooms.remove(args[1]);
+							request = "You leaved the room";
+						}
+						System.out.println(request);
+						activeHandlers.sendMessageToSelf(SocketHandler.this, request);
+						continue;
+					}
+					
+					if (request.startsWith("#groups")) {
+						request = String.join(",", rooms);
+						System.out.println(request);
+						activeHandlers.sendMessageToSelf(SocketHandler.this, request);
+						continue;
+					}
+
+
+
+					request = "["+name+"] >> " + request;
 					System.out.println(request);
 					activeHandlers.sendMessageToAll(SocketHandler.this, request);
 				}
