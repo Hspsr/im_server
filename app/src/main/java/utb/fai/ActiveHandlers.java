@@ -11,12 +11,6 @@ public class ActiveHandlers {
             System.err.printf("Client %s message queue is full, dropping the message!\n", sender.clientID);
     }
 
-    /**
-     * sendMessageToAll - Pole zprávu vem aktivním klientùm kromì sebe sama
-     * 
-     * @param sender  - reference odesílatele
-     * @param message - øetìzec se zprávou
-     */
     synchronized void sendMessageToAll(SocketHandler sender, String message) {
         for (SocketHandler handler : activeHandlersSet) // pro vechny aktivní handlery
             if (handler != sender & !Collections.disjoint(sender.rooms, handler.rooms)) {
